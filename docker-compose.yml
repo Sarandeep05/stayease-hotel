@@ -1,0 +1,37 @@
+# Runs the whole StayEase stack locally: MongoDB + Spring Boot API + React (nginx).
+# Usage:  docker compose up --build
+services:
+  mongo:
+    image: mongo:7
+    container_name: stayease-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: stayease-backend
+    depends_on:
+      - mongo
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/stayease
+      JWT_SECRET: local-dev-secret-change-me-to-a-64-char-random-string-please-000000
+      CORS_ALLOWED_ORIGINS: http://localhost:8081,http://localhost:5173
+      SEED_ENABLED: "true"
+      # Notifications are disabled by default; set these to enable.
+      MAIL_ENABLED: "false"
+      TWILIO_ENABLED: "false"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    container_name: stayease-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+
+volumes:
+  mongo_data:
