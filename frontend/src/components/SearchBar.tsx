@@ -1,7 +1,8 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Calendar, Users, Search } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import { api } from '../lib/api';
 
 interface Props {
   initial?: { destination?: string; checkIn?: string; checkOut?: string; guests?: number };
@@ -16,6 +17,71 @@ export default function SearchBar({ initial }: Props) {
   const [checkIn, setCheckIn] = useState(initial?.checkIn ?? today);
   const [checkOut, setCheckOut] = useState(initial?.checkOut ?? tomorrow);
   const [guests, setGuests] = useState(initial?.guests ?? 2);
+
+  // --- Destination autocomplete ---
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  // Set when the user picks a suggestion, so we don't immediately re-query.
+  const justSelected = useRef(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (justSelected.current) {
+      justSelected.current = false;
+      return;
+    }
+    const q = destination.trim();
+    if (q.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      api
+        .get<string[]>('/hotels/cities', { params: { q } })
+        .then((res) => {
+          setSuggestions(res.data);
+          setActiveIndex(-1);
+        })
+        .catch(() => setSuggestions([]));
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [destination]);
+
+  // Close the dropdown when clicking outside.
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, []);
+
+  const choose = (city: string) => {
+    justSelected.current = true;
+    setDestination(city);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setActiveIndex(-1);
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      choose(suggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -32,7 +98,7 @@ export default function SearchBar({ initial }: Props) {
       onSubmit={submit}
       className="grid grid-cols-1 gap-3 rounded-xl bg-white p-4 shadow-lg sm:grid-cols-2 lg:grid-cols-5"
     >
-      <div className="lg:col-span-2">
+      <div className="relative lg:col-span-2" ref={boxRef}>
         <label className="label flex items-center gap-1">
           <MapPin className="h-4 w-4 text-brand-600" /> Destination
         </label>
@@ -40,8 +106,33 @@ export default function SearchBar({ initial }: Props) {
           className="input"
           placeholder="City, hotel or country"
           value={destination}
-          onChange={(e) => setDestination(e.target.value)}
+          autoComplete="off"
+          onChange={(e) => {
+            setDestination(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onKeyDown={onKeyDown}
         />
+        {showSuggestions && suggestions.length > 0 && (
+          <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+            {suggestions.map((city, i) => (
+              <li key={city}>
+                <button
+                  type="button"
+                  onClick={() => choose(city)}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                    i === activeIndex ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+                  {city}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       <div>
         <label className="label flex items-center gap-1">

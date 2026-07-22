@@ -54,6 +54,12 @@ public class HotelController {
         return ResponseEntity.ok(hotelService.search(request));
     }
 
+    @GetMapping("/cities")
+    @Operation(summary = "City-name suggestions for the destination autocomplete (public)")
+    public ResponseEntity<List<String>> citySuggestions(@RequestParam(required = false) String q) {
+        return ResponseEntity.ok(hotelService.suggestCities(q));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get hotel detail with rooms (public)")
     public ResponseEntity<HotelResponse> getById(@PathVariable String id) {

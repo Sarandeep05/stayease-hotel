@@ -46,6 +46,11 @@ public class HotelService {
         return PagedResponse.from(page, HotelResponse::from);
     }
 
+    /** City-name suggestions for the destination autocomplete. */
+    public List<String> suggestCities(String query) {
+        return hotelSearchRepository.suggestCities(query, 8);
+    }
+
     public HotelResponse getById(String id) {
         Hotel hotel = findHotel(id);
         HotelResponse response = HotelResponse.from(hotel);

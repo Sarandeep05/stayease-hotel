@@ -16,6 +16,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -73,6 +74,24 @@ public class HotelSearchRepository {
 
         List<Hotel> hotels = mongoTemplate.find(query, Hotel.class);
         return new PageImpl<>(hotels, pageable, total);
+    }
+
+    /**
+     * Distinct active-hotel city names that START WITH the given prefix
+     * (case-insensitive), for the destination autocomplete dropdown.
+     */
+    public List<String> suggestCities(String prefix, int limit) {
+        Criteria criteria = Criteria.where("status").is(HotelStatus.ACTIVE);
+        if (StringUtils.hasText(prefix)) {
+            criteria.and("city").regex("^" + Pattern.quote(prefix.trim()), "i");
+        }
+        Query query = new Query(criteria);
+        List<String> cities = mongoTemplate.findDistinct(query, "city", Hotel.class, String.class);
+        return cities.stream()
+                .filter(Objects::nonNull)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .limit(limit)
+                .toList();
     }
 
     private Sort resolveSort(String sortBy) {
