@@ -7,10 +7,13 @@ import com.stayease.dto.response.PagedResponse;
 import com.stayease.dto.response.RoomResponse;
 import com.stayease.exception.ForbiddenException;
 import com.stayease.exception.ResourceNotFoundException;
+import com.stayease.model.Booking;
+import com.stayease.model.BookingStatus;
 import com.stayease.model.Hotel;
 import com.stayease.model.HotelStatus;
 import com.stayease.model.Review;
 import com.stayease.model.Room;
+import com.stayease.repository.BookingRepository;
 import com.stayease.repository.HotelRepository;
 import com.stayease.repository.HotelSearchRepository;
 import com.stayease.repository.ReviewRepository;
@@ -22,6 +25,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -35,15 +39,61 @@ public class HotelService {
     private final RoomRepository roomRepository;
     private final ReviewRepository reviewRepository;
     private final HotelSearchRepository hotelSearchRepository;
+    private final BookingRepository bookingRepository;
+
+    private static final List<BookingStatus> ACTIVE_BOOKINGS =
+            List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
 
     // --- Public read ---
 
     public PagedResponse<HotelResponse> search(HotelSearchRequest request) {
-        Pageable pageable = PageRequest.of(
-                Optional.ofNullable(request.getPage()).orElse(0),
-                Optional.ofNullable(request.getSize()).orElse(12));
-        Page<Hotel> page = hotelSearchRepository.search(request, pageable);
-        return PagedResponse.from(page, HotelResponse::from);
+        int page = Optional.ofNullable(request.getPage()).orElse(0);
+        int size = Optional.ofNullable(request.getSize()).orElse(12);
+
+        boolean hasDates = request.getCheckIn() != null
+                && request.getCheckOut() != null
+                && request.getCheckOut().isAfter(request.getCheckIn());
+
+        // Without dates, let MongoDB handle pagination directly.
+        if (!hasDates) {
+            Page<Hotel> result = hotelSearchRepository.search(request, PageRequest.of(page, size));
+            return PagedResponse.from(result, HotelResponse::from);
+        }
+
+        // With dates, filter to hotels that actually have a room free for the
+        // requested range, then paginate the filtered result in memory.
+        List<Hotel> candidates = hotelSearchRepository
+                .search(request, PageRequest.of(0, 500)).getContent();
+        List<Hotel> available = candidates.stream()
+                .filter(h -> hasAvailability(h.getId(), request.getCheckIn(), request.getCheckOut()))
+                .toList();
+
+        int total = available.size();
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+        List<HotelResponse> content = available.subList(from, to).stream()
+                .map(HotelResponse::from).toList();
+        int totalPages = (int) Math.ceil((double) total / size);
+        boolean last = page >= totalPages - 1;
+
+        return new PagedResponse<>(content, page, size, total, Math.max(totalPages, 1), last);
+    }
+
+    /** True if the hotel has at least one active room with a free unit for the range. */
+    private boolean hasAvailability(String hotelId, LocalDate checkIn, LocalDate checkOut) {
+        for (Room room : roomRepository.findByHotelIdAndActiveTrue(hotelId)) {
+            int total = room.getTotalUnits() == null ? 0 : room.getTotalUnits();
+            List<Booking> overlapping = bookingRepository
+                    .findByRoomIdAndStatusInAndCheckInLessThanAndCheckOutGreaterThan(
+                            room.getId(), ACTIVE_BOOKINGS, checkOut, checkIn);
+            int booked = overlapping.stream()
+                    .mapToInt(b -> b.getNumberOfRooms() == null ? 1 : b.getNumberOfRooms())
+                    .sum();
+            if (total - booked > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** City-name suggestions for the destination autocomplete. */

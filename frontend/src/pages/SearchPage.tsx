@@ -27,13 +27,16 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState('ratingDesc');
 
   const query = useMemo(
-    () => ({ destination, minPrice, maxPrice, minRating, starRating, amenities: amenities.join(','), sortBy }),
-    [destination, minPrice, maxPrice, minRating, starRating, amenities, sortBy]
+    () => ({ destination, checkIn, checkOut, minPrice, maxPrice, minRating, starRating, amenities: amenities.join(','), sortBy }),
+    [destination, checkIn, checkOut, minPrice, maxPrice, minRating, starRating, amenities, sortBy]
   );
 
   useEffect(() => {
     setLoading(true);
     const requestParams: Record<string, unknown> = { destination, sortBy, size: 24 };
+    // Sending dates makes the backend return only hotels with a free room for the range.
+    if (checkIn) requestParams.checkIn = checkIn;
+    if (checkOut) requestParams.checkOut = checkOut;
     if (minPrice) requestParams.minPrice = minPrice;
     if (maxPrice) requestParams.maxPrice = maxPrice;
     if (minRating) requestParams.minRating = minRating;

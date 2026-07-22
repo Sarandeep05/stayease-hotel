@@ -10,11 +10,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -31,6 +33,9 @@ public class HotelController {
     @Operation(summary = "Search & filter hotels (public)")
     public ResponseEntity<PagedResponse<HotelResponse>> search(
             @RequestParam(required = false) String destination,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkIn,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate checkOut,
+            @RequestParam(required = false) Integer guests,
             @RequestParam(required = false) Double minPrice,
             @RequestParam(required = false) Double maxPrice,
             @RequestParam(required = false) Double minRating,
@@ -42,6 +47,9 @@ public class HotelController {
 
         HotelSearchRequest request = new HotelSearchRequest();
         request.setDestination(destination);
+        request.setCheckIn(checkIn);
+        request.setCheckOut(checkOut);
+        request.setGuests(guests);
         request.setMinPrice(minPrice);
         request.setMaxPrice(maxPrice);
         request.setMinRating(minRating);
