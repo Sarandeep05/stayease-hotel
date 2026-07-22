@@ -139,12 +139,12 @@ public class BookingService {
         if (booking.getPaymentStatus() == PaymentStatus.PAID) {
             booking.setPaymentStatus(PaymentStatus.REFUNDED);
         }
-        booking = bookingRepository.save(booking);
+        Booking saved = bookingRepository.save(booking);
 
-        userRepository.findById(booking.getCustomerId()).ifPresent(u ->
-                notificationService.notifyBookingCancelled(u.getEmail(), u.getPhone(), booking.getReference()));
+        userRepository.findById(saved.getCustomerId()).ifPresent(u ->
+                notificationService.notifyBookingCancelled(u.getEmail(), u.getPhone(), saved.getReference()));
 
-        return BookingResponse.from(booking);
+        return BookingResponse.from(saved);
     }
 
     /** Manager/admin can mark a confirmed booking as completed after checkout. */
