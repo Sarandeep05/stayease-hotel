@@ -69,7 +69,9 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         List<String> origins = Arrays.stream(appProperties.getCors().getAllowedOrigins().split(","))
                 .map(String::trim).toList();
-        config.setAllowedOrigins(origins);
+        // Patterns (not exact origins) so wildcards like http://localhost:* work
+        // for any Vite dev port, while still matching exact production URLs.
+        config.setAllowedOriginPatterns(origins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

@@ -31,7 +31,7 @@ app:
     access-token-expiration-ms: ${JWT_ACCESS_EXPIRATION:86400000}      # 1 day
     refresh-token-expiration-ms: ${JWT_REFRESH_EXPIRATION:604800000}    # 7 days
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:*}
   mail:
     from: ${MAIL_FROM:no-reply@stayease.com}
     enabled: ${MAIL_ENABLED:false}
